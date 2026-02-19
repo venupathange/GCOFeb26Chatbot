@@ -73,8 +73,20 @@ AZURE_DEPLOYMENT_NAME=gpt-4o-mini
 3. Click "Keys and Endpoint" → Copy Endpoint and Key
 4. Click "Model deployments" → Copy your deployment name
 
-### **Step 5: Initialize Database (if needed)**
+### **Step 5: Initialize Database**
 
+Run the database setup script:
+
+```powershell
+python setup_database.py
+```
+
+This will:
+- Create `inventory.db` from `inventory_setup.sql`
+- Load 8 products with stock and pricing data
+- Display sample data to verify setup
+
+**Alternative (manual setup):**
 ```powershell
 sqlite3 inventory.db < inventory_setup.sql
 ```
@@ -169,6 +181,8 @@ GCOFeb26Chatbot/
 │
 ├── main.py                    # Entry point - CLI loop
 ├── config.py                  # Configuration settings
+├── setup_database.py          # Database initialization script
+├── run_tests.py               # Automated test runner
 ├── requirements.txt           # Python dependencies
 ├── .env                       # Azure OpenAI credentials (create this)
 ├── .gitignore                # Git ignore rules
@@ -220,10 +234,21 @@ self.company_data = {
 
 ## 🧪 Testing
 
-### **Run Test Suite**
+### **Automated Test Suite**
 
-The `test_suite.json` file contains 10 test cases:
+Run all 10 test cases automatically:
 
+```powershell
+python run_tests.py
+```
+
+This will:
+- Load test cases from `test_suite.json`
+- Run each test against the chatbot
+- Display pass/fail results with detailed output
+- Show success rate and failed test details
+
+**Test Coverage:**
 - **Knowledge Base (3 tests)**: Office address, opening hours, delivery pricing
 - **Database (4 tests)**: Stock availability, out of stock, stock counts, pricing
 - **Fallback (3 tests)**: Unrelated questions
@@ -398,7 +423,13 @@ pip install -r requirements.txt
 # Configure (edit .env with your credentials)
 notepad .env
 
-# Run
+# Initialize database
+python setup_database.py
+
+# Run tests
+python run_tests.py
+
+# Run chatbot
 python main.py
 
 # Exit chatbot
@@ -406,5 +437,8 @@ Type: exit
 ```
 
 ---
-
+![Screen shot](image.png)
 **Built with ❤️ for GCO Feb 26 Assessment**
+
+
+!
