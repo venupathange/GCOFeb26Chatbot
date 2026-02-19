@@ -4,6 +4,10 @@ Configuration settings for Tri-Tier Chatbot
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Base directory
 BASE_DIR = Path(__file__).parent

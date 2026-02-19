@@ -1,94 +1,153 @@
 """
-Knowledge Base Service - Tier 1
-Handles static question-answer matching from knowledge_base.txt
+Knowledge Base Service - Tier 1 (Enhanced with Semantic Matching)
+Handles company information queries using structured metadata and intelligent matching
 """
 
-from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
+from openai import AzureOpenAI
 import config
 
 
 class KnowledgeBaseService:
-    """Service for handling knowledge base queries"""
+    """Service for handling knowledge base queries with semantic understanding"""
     
-    def __init__(self, kb_path: Path = config.KNOWLEDGE_BASE_PATH):
+    def __init__(self):
+        """Initialize the Knowledge Base Service with structured company data"""
+        
+        # Structured company metadata
+        self.company_data = {
+            "company_name": "TechGear UK",
+            "location": "124 High Street, London, EC1A 1BB",
+            "office_hours": "Monday to Friday, 09:00 - 18:00. Saturday, 10:00 - 16:00.",
+            "delivery_policy": "Standard delivery takes 3-5 working days. Next-day delivery is available for £5.99.",
+            "returns": "Items can be returned within 30 days of purchase with a valid receipt.",
+            "contact": "Support can be reached at support@techgear.co.uk or 020 7946 0000."
+        }
+        
+        # Initialize Azure OpenAI client for semantic classification
+        if config.AZURE_OPENAI_ENDPOINT and config.AZURE_OPENAI_KEY:
+            self.client = AzureOpenAI(
+                azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
+                api_key=config.AZURE_OPENAI_KEY,
+                api_version=config.AZURE_API_VERSION
+            )
+            self.model = config.AZURE_DEPLOYMENT_NAME
+        else:
+            self.client = None
+            self.model = None
+    
+    def _classify_company_query(self, query: str) -> Optional[str]:
         """
-        Initialize the Knowledge Base Service
+        Use LLM to classify what type of company information is being requested
         
         Args:
-            kb_path: Path to the knowledge base file
-        """
-        self.kb_path = kb_path
-        self.kb_data = self._load_knowledge_base()
-    
-    def _load_knowledge_base(self) -> dict:
-        """
-        Load knowledge base from file into memory
+            query: User's question
         
         Returns:
-            Dictionary mapping questions to answers
+            Classification: 'company_name', 'location', 'office_hours', 'delivery_policy', 
+                           'returns', 'contact', 'general_info', or None
         """
-        kb_dict = {}
+        if not self.client:
+            return None
         
         try:
-            with open(self.kb_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # System prompt for classification
+            system_prompt = """You are a query classifier for TechGear UK company information.
+Classify the user query into ONE of these categories:
+- company_name: asking about company name, what is the company, company identity
+- location: asking about address, location, where located, where are you
+- office_hours: asking about opening hours, timings, when open, office hours
+- delivery_policy: asking about delivery, shipping, how long delivery takes
+- returns: asking about return policy, refunds, returning items
+- contact: asking about contact details, phone, email, how to reach
+- general_info: broad questions like "about the company", "company data", "tell me about techgear"
+- not_company: not asking about company information
+
+Respond with ONLY the category name, nothing else."""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query}
+            ]
             
-            # Parse the knowledge base content
-            # Store key information for matching
-            kb_dict['office address'] = '124 High Street, London, EC1A 1BB'
-            kb_dict['location'] = '124 High Street, London, EC1A 1BB'
-            kb_dict['address'] = '124 High Street, London, EC1A 1BB'
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0,
+                max_tokens=20
+            )
             
-            kb_dict['office hours'] = 'Monday to Friday, 09:00 - 18:00. Saturday, 10:00 - 16:00.'
-            kb_dict['opening hours'] = 'Monday to Friday, 09:00 - 18:00. Saturday, 10:00 - 16:00.'
-            kb_dict['open monday'] = '09:00 - 18:00'
-            kb_dict['open tuesday'] = '09:00 - 18:00'
-            kb_dict['open wednesday'] = '09:00 - 18:00'
-            kb_dict['open thursday'] = '09:00 - 18:00'
-            kb_dict['open friday'] = '09:00 - 18:00'
-            kb_dict['open saturday'] = '10:00 - 16:00'
+            classification = response.choices[0].message.content.strip().lower()
             
-            kb_dict['delivery'] = 'Standard delivery takes 3-5 working days. Next-day delivery is available for £5.99.'
-            kb_dict['delivery policy'] = 'Standard delivery takes 3-5 working days. Next-day delivery is available for £5.99.'
-            kb_dict['next-day delivery'] = '£5.99'
-            kb_dict['next day delivery'] = '£5.99'
-            kb_dict['standard delivery'] = '3-5 working days'
+            # Return classification if it's a valid company info type
+            if classification in ['company_name', 'location', 'office_hours', 'delivery_policy', 
+                                 'returns', 'contact', 'general_info']:
+                return classification
             
-            kb_dict['returns'] = 'Items can be returned within 30 days of purchase with a valid receipt.'
-            kb_dict['return policy'] = 'Items can be returned within 30 days of purchase with a valid receipt.'
-            
-            kb_dict['contact'] = 'Support can be reached at support@techgear.co.uk or 020 7946 0000.'
-            kb_dict['support'] = 'Support can be reached at support@techgear.co.uk or 020 7946 0000.'
-            kb_dict['phone'] = '020 7946 0000'
-            kb_dict['email'] = 'support@techgear.co.uk'
-            
-        except FileNotFoundError:
-            print(f"Warning: Knowledge base file not found at {self.kb_path}")
-        except Exception as e:
-            print(f"Warning: Error loading knowledge base: {e}")
+            return None
         
-        return kb_dict
+        except Exception as e:
+            print(f"KB Classification Error: {e}")
+            return None
+    
+    def _generate_company_response(self, classification: str, query: str) -> str:
+        """
+        Generate appropriate company information response based on classification
+        
+        Args:
+            classification: Type of information requested
+            query: Original user query
+        
+        Returns:
+            Formatted response string
+        """
+        # Direct field responses
+        if classification == "company_name":
+            return self.company_data["company_name"]
+        
+        elif classification == "location":
+            return self.company_data["location"]
+        
+        elif classification == "office_hours":
+            return self.company_data["office_hours"]
+        
+        elif classification == "delivery_policy":
+            return self.company_data["delivery_policy"]
+        
+        elif classification == "returns":
+            return self.company_data["returns"]
+        
+        elif classification == "contact":
+            return self.company_data["contact"]
+        
+        elif classification == "general_info":
+            # Generate comprehensive company summary for broad queries
+            return (
+                f"{self.company_data['company_name']} is located at {self.company_data['location']}. "
+                f"We are open {self.company_data['office_hours']} "
+                f"For support, contact {self.company_data['contact'].replace('Support can be reached at ', '')}"
+            )
+        
+        return None
     
     def search(self, query: str) -> Optional[str]:
         """
-        Search for an answer in the knowledge base
+        Search for company information using semantic classification
         
         Args:
-            query: User's question (case-insensitive)
+            query: User's question
         
         Returns:
-            Answer string if found, None otherwise
+            Answer string if company info found, None otherwise
         """
-        query_lower = query.lower().strip()
+        # Step 1: Classify the query using LLM
+        classification = self._classify_company_query(query)
         
-        # Direct match
-        if query_lower in self.kb_data:
-            return self.kb_data[query_lower]
+        # Step 2: If classified as company info, generate appropriate response
+        if classification:
+            response = self._generate_company_response(classification, query)
+            if response:
+                return response
         
-        # Partial matching for better coverage
-        for key, value in self.kb_data.items():
-            if key in query_lower:
-                return value
-        
+        # Step 3: If no classification or response, return None (will proceed to next tier)
         return None
